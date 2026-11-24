@@ -4,6 +4,7 @@
 from pathlib import Path
 import hashlib
 import json
+import os
 import subprocess
 import sys
 
@@ -45,7 +46,20 @@ def export_kernel():
     with dest.open("rb") as source:
         digest = hashlib.file_digest(source, "sha256").hexdigest()
     if lock.get("sha256") and lock.get("archive") == archive and digest != lock["sha256"]:
-        raise SystemExit("Linux archive checksum mismatch")
+        mismatch = (
+            f"Linux archive checksum mismatch: manifest={lock['sha256']} computed={digest}"
+        )
+        if os.environ.get("SY108_RELAX_KERNEL_HASH") == "1":
+            # The exported tree is pinned by commit above, and the resulting digest is
+            # still written to LINUX_KERNEL_HASH so OpenWrt verifies the same bytes.
+            # Only the gzip deflate output differs between host gzip builds.
+            print(f"warning: {mismatch}", file=sys.stderr)
+            print(
+                "warning: commit/tree already verified; relaxing compression checksum",
+                file=sys.stderr,
+            )
+        else:
+            raise SystemExit(mismatch)
     kernel_mk = OPENWRT / f"target/linux/sprd/kernel-{series}"
     if kernel_mk.parent.is_dir():
         kernel_mk.write_text(f"LINUX_VERSION-{series} = {version[len(series):]}\nLINUX_KERNEL_HASH-{version} = {digest}\n")

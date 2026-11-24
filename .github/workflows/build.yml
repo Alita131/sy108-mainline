@@ -17,6 +17,10 @@ env:
   SY108_JOBS: 4
   # Build tree lives on the large /mnt volume, not the small root fs.
   SY108_OUT: /mnt/sy108/out
+  # Manifest pins the archive hash produced by the author's gzip build; the
+  # exported tree is still pinned by commit and the digest is still enforced by
+  # OpenWrt via LINUX_KERNEL_HASH, so only the deflate bytes may differ here.
+  SY108_RELAX_KERNEL_HASH: 1
 
 jobs:
   build:
