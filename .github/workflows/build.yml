@@ -1,0 +1,92 @@
+name: build-firmware
+
+on:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  # 4-core runner: keep container CPU count at core count to avoid thrash.
+  SY108_JOBS: 4
+  # Build tree lives on the large /mnt volume, not the small root fs.
+  SY108_OUT: /mnt/sy108/out
+
+jobs:
+  build:
+    # Native arm64 runner: no QEMU emulation, matches the repo's required
+    # --platform linux/arm64 container.
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 350
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Reclaim disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc \
+                      /usr/local/.ghcup /usr/local/share/boost \
+                      /opt/hostedtoolcache/CodeQL 2>/dev/null || true
+          sudo apt-get clean
+          df -h /
+
+      - name: Prepare large build volume
+        run: |
+          sudo mkdir -p /mnt/sy108/out
+          sudo chown -R "$(id -u):$(id -g)" /mnt/sy108
+          df -h / /mnt
+          free_gb=$(df -BG --output=avail /mnt | tail -1 | tr -dc '0-9')
+          echo "free space on /mnt: ${free_gb}G"
+          if [ "${free_gb:-0}" -lt 20 ]; then
+            echo "::error::/mnt has less than 20G free; OpenWrt build will not fit"
+            exit 1
+          fi
+
+      - name: Preflight
+        run: |
+          python3 --version
+          git --version
+          docker version --format '{{.Server.Version}}'
+          docker run --rm --platform linux/arm64 debian:13 uname -m
+
+      - name: Bootstrap fixed sources
+        run: tools/python tools/bootstrap.py
+
+      - name: Build main profile
+        run: tools/python tools/build/firmware.py main
+
+      - name: Build recovery profile
+        run: tools/python tools/build/firmware.py recovery
+
+      - name: List artifacts
+        run: |
+          ls -lh out/images/main out/images/recovery
+          sha256sum out/images/main/* out/images/recovery/* || true
+
+      - name: Upload images
+        uses: actions/upload-artifact@v4
+        with:
+          name: sy108-images
+          path: |
+            out/images/main/**
+            out/images/recovery/**
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish release
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete ci-build --yes --cleanup-tag 2>/dev/null || true
+          gh release create ci-build \
+            out/images/main/sysupgrade.bin \
+            out/images/recovery/boot.bin \
+            --title "CI build #${{ github.run_number }}" \
+            --notes "Auto build from ${GITHUB_SHA} at $(date -u +%FT%TZ)"
