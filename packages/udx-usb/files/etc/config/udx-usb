@@ -1,6 +1,9 @@
 config gadget 'main'
 	option enabled '1'
-	option profile 'ncm'
+	# rndis is the only ethernet class that both Windows (inbox usb8023) and
+	# Android 8+ / car head units (rndis_host) drive without extra packages,
+	# so a fresh unit works by plugging it in anywhere.
+	option profile 'rndis'
 	option acm '0'
 	# auto derives from this unit's bootloader-provided factory product serial.
 	# A concrete value is an explicit per-field override, including legacy values.

@@ -1,9 +1,9 @@
 # UDX USB 管理包（`udx-usb`）
 
 `udx-usb` 在 `29100000.usb`（USB1）上提供 CDC-NCM 网络管理接口与可选的受认证 ACM 串口终端：
-- 主系统默认启用 **PAM U3 硬件加速模式（`ncm`）**，支持切换至软件处理模式（`ncm-software`）用于对比诊断；
-- 独立 Recovery 默认使用软件模式（`ncm-software`）；
-- 包含 Microsoft OS 1.0 `WINNCM` 兼容描述符，支持 Windows 11、macOS 与 Linux 免驱枚举。
+- 主系统默认 **`rndis`**（Windows 与 Android 8+ / 车机免驱即插即用），可切换到 `ncm`（PAM U3 硬件加速，Windows 11 / 现代 Linux 最快）、`ncm-software`（软件通路，用于对比诊断）、`ecm`、`eem`；
+- 独立 Recovery 固定使用软件模式（`ncm-software`），不受主系统默认值影响；
+- `ncm` 模式包含 Microsoft OS 1.0 `WINNCM` 兼容描述符，`rndis` 模式包含 `RNDIS`/`5162001`；`ecm`、`eem` 无 MS 描述符。
 
 ## 组件与文件结构
 
