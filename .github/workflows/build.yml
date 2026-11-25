@@ -70,16 +70,16 @@ jobs:
 
       - name: List artifacts
         run: |
-          ls -lh out/images/main out/images/recovery
-          sha256sum out/images/main/* out/images/recovery/* || true
+          ls -lh "$SY108_OUT/images/main" "$SY108_OUT/images/recovery"
+          sha256sum "$SY108_OUT"/images/main/* "$SY108_OUT"/images/recovery/* || true
 
       - name: Upload images
         uses: actions/upload-artifact@v4
         with:
           name: sy108-images
           path: |
-            out/images/main/**
-            out/images/recovery/**
+            /mnt/sy108/out/images/main/**
+            /mnt/sy108/out/images/recovery/**
           if-no-files-found: error
           retention-days: 14
 
@@ -90,7 +90,7 @@ jobs:
         run: |
           gh release delete ci-build --yes --cleanup-tag 2>/dev/null || true
           gh release create ci-build \
-            out/images/main/sysupgrade.bin \
-            out/images/recovery/boot.bin \
+            "$SY108_OUT/images/main/sysupgrade.bin" \
+            "$SY108_OUT/images/recovery/boot.bin" \
             --title "CI build #${{ github.run_number }}" \
             --notes "Auto build from ${GITHUB_SHA} at $(date -u +%FT%TZ)"
