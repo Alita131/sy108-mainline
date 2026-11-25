@@ -183,6 +183,7 @@ static J *usb_status(void)
 	json_object_array_add(profiles, json_object_new_string("ncm-software"));
 	json_object_array_add(profiles, json_object_new_string("rndis"));
 	json_object_array_add(profiles, json_object_new_string("ecm"));
+	json_object_array_add(profiles, json_object_new_string("eem"));
 	json_object_object_add(out, "profiles", profiles);
 	text_file(out, "offload_state", "/sys/bus/platform/devices/2b300000.pamu3/offload_state");
 	return out;
@@ -335,7 +336,8 @@ static J *usb_request(J *arguments)
 	const char *profile = str(arguments, "profile");
 	J *acm = get(arguments, "acm");
 	if ((!text_equal(profile, "ncm") && !text_equal(profile, "ncm-software") &&
-	     !text_equal(profile, "rndis") && !text_equal(profile, "ecm")) ||
+	     !text_equal(profile, "rndis") && !text_equal(profile, "ecm") &&
+	     !text_equal(profile, "eem")) ||
 	    !json_object_is_type(acm, json_type_boolean)) {
 		errorf(CELL_INVALID, "Invalid USB profile");
 		return NULL;

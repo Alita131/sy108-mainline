@@ -23,6 +23,7 @@
 | `ncm-software` | `0x0105` | `0x0115` | 接口 0/1：CDC-NCM（内核软件数据通路） | `uncm0` |
 | `rndis` | `0x0106` | `0x0116` | 接口 0/1：RNDIS（`ef/04/01`，MS 描述符 `RNDIS`/`5162001`） | `uncm0` |
 | `ecm` | `0x0107` | `0x0117` | 接口 0/1：CDC-ECM（无 MS 描述符） | `uncm0` |
+| `eem` | `0x0108` | `0x0118` | 单接口：CDC-EEM（`02/0e`，无功能描述符） | `uncm0` |
 
 所有模式统一使用 `uncm0` 作为网络设备名，切换模式不会改变 `br-usb` 的成员，因此 DHCP、防火墙与路由配置无需随之调整。
 
@@ -34,6 +35,7 @@
 | Windows 10/11 | `ncm` | 原生 `UsbNcm.sys`，并支持 PAM U3 硬件卸载 |
 | Windows 7/8 | `rndis` | 系统自带 `usb8023`/`rndismpx` |
 | Linux / macOS | `ncm` 或 `ecm` | 均为内核原生类驱动，无需安装 |
+| 主机拒绝 ECM/NCM 枚举 | `eem` | 无 CDC 功能描述符，Android/Linux 均内置 `cdc_eem`，作为兜底模式 |
 | 需要旁路调试通道 | 任意模式 + `acm` | 额外暴露 `/dev/ttyGS0` ↔ 主机 `/dev/ttyACM0` |
 
 若配置的模式在启动时无法实例化（内核缺对应 gadget 功能或描述符写入失败），`udx-usb-gadget start` 会自动回退到 `ncm` 并把该回退写回 UCI，保证设备不会因为一个不可用的模式而失去管理链路。

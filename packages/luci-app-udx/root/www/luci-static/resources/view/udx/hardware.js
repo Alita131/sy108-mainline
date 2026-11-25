@@ -390,6 +390,7 @@ return view.extend({
         profile.value('ncm-software', _('NCM software mode'));
         profile.value('rndis', _('RNDIS (Android hosts and car head units)'));
         profile.value('ecm', _('CDC-ECM (Linux, Android, macOS)'));
+        profile.value('eem', _('CDC-EEM (fallback for hosts rejecting ECM/NCM)'));
         var acm = s.option(form.Flag, 'acm', _('Authenticated ACM console'));
         var apply = s.option(form.Button, '_apply', _('Apply USB configuration'));
         apply.inputtitle = _('Apply');

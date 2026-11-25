@@ -177,7 +177,7 @@ g_load_config() {
 	# A hand-edited or downgraded config must not leave the unit without a
 	# management link: unknown values start in the proven default instead.
 	case "$PROFILE" in
-		ncm|ncm-software|rndis|ecm) ;;
+		ncm|ncm-software|rndis|ecm|eem) ;;
 		*) g_error "unknown profile '$PROFILE'; starting in ncm instead"
 		   PROFILE=ncm ;;
 	esac
@@ -207,7 +207,11 @@ g_profile() {
 		# ECM: native in Linux, Android and macOS; no Windows driver exists and
 		# the function has no os_desc, so MS descriptors stay disabled.
 		ecm) FUNCTIONS=ecm; PID=0x0107; PAMU3=0; OS_DESC=0 ;;
-		*) g_error 'profile must be ncm, ncm-software, rndis or ecm'; return 64 ;;
+		# EEM: no CDC functional descriptors at all, so hosts that reject
+		# ECM/NCM still enumerate it. Android and Linux both ship cdc_eem;
+		# kept as the last-resort ethernet mode.
+		eem) FUNCTIONS=eem; PID=0x0108; PAMU3=0; OS_DESC=0 ;;
+		*) g_error 'profile must be ncm, ncm-software, rndis, ecm or eem'; return 64 ;;
 	esac
 	case "$ACM" in
 		0) ;;
@@ -284,6 +288,7 @@ g_net_function() {
 		ncm) dir=$UDX_G/functions/ncm.usb0 ;;
 		rndis) dir=$UDX_G/functions/rndis.usb0 ;;
 		ecm) dir=$UDX_G/functions/ecm.usb0 ;;
+		eem) dir=$UDX_G/functions/eem.usb0 ;;
 		*) g_error "unsupported ethernet function $kind"; return 64 ;;
 	esac
 	g_mkdir "$dir" || return 1

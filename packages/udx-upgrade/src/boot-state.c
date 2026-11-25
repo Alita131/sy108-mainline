@@ -374,7 +374,8 @@ static int boot_management_ready(void)
 	    strcmp(value, "29100000.usb\n") || text("/run/udx-usb/applied", value, sizeof(value)) ||
 	    (strncmp(value, "profile=ncm\n", 12) &&
 	     strncmp(value, "profile=ncm-software\n", 21) &&
-	     strncmp(value, "profile=rndis\n", 14) && strncmp(value, "profile=ecm\n", 12)) ||
+	     strncmp(value, "profile=rndis\n", 14) && strncmp(value, "profile=ecm\n", 12) &&
+	     strncmp(value, "profile=eem\n", 12)) ||
 	    management_listener(22) || (management_listener(80) && management_listener(443)) ||
 	    management_network_ready())
 		return -1;

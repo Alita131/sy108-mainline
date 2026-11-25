@@ -32,10 +32,11 @@ case "${1:-status}" in
 		exit 0
 		;;
 	*)
-		echo 'usage: udx-usbctl status | start | switch {ncm|ncm-software|rndis|ecm} [acm|no-acm] | reset | stop | cancel-pending' >&2
+		echo 'usage: udx-usbctl status | start | switch {ncm|ncm-software|rndis|ecm|eem} [acm|no-acm] | reset | stop | cancel-pending' >&2
 		echo '  ncm       Windows 11 / modern Linux, fastest (PAM U3 offload)' >&2
 		echo '  rndis     Android 8+ hosts and car head units, Windows 7+; plug and play' >&2
 		echo '  ecm       Linux / Android / macOS native, no Windows driver' >&2
+		echo '  eem       last resort: no CDC descriptors, works on hosts that reject ECM/NCM' >&2
 		exit 64;;
 esac
 if [ "$request" = reset ] && [ -f "$UDX_RUN/pending" ] && [ "$(g_read "$UDX_RUN/pending")" = reset ]; then
