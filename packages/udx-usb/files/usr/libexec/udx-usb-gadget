@@ -57,7 +57,24 @@ case "${1:-}" in
 			g_error 'already bound; configuration changes require explicit switch'
 			exit 0
 		fi
-		if ! g_create; then g_destroy || true; exit 1; fi
+		if ! g_create; then
+			g_destroy || true
+			# A profile that cannot be instantiated must never leave the unit
+			# without a management link at boot. Fall back to the proven
+			# default and persist it so the next boot is deterministic.
+			[ "$PROFILE" = ncm ] && exit 1
+			g_error "profile '$PROFILE' could not be created; falling back to ncm"
+			PROFILE=ncm ACM=0
+			g_profile || exit 1
+			g_create || {
+				g_destroy || true
+				g_error 'ncm fallback also failed; maintenance console required'
+				exit 1
+			}
+			uci -q set udx-usb.main.profile=ncm
+			uci -q set udx-usb.main.acm=0
+			uci -q commit udx-usb
+		fi
 		g_state_save || exit 1
 		g_network_ready
 		;;

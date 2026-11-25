@@ -21,6 +21,22 @@
 |---|---|---|---|---|
 | `ncm` | `0x0105` | `0x0115` | 接口 0/1：CDC-NCM（PAM U3 硬件卸载） | `uncm0` |
 | `ncm-software` | `0x0105` | `0x0115` | 接口 0/1：CDC-NCM（内核软件数据通路） | `uncm0` |
+| `rndis` | `0x0106` | `0x0116` | 接口 0/1：RNDIS（`ef/04/01`，MS 描述符 `RNDIS`/`5162001`） | `uncm0` |
+| `ecm` | `0x0107` | `0x0117` | 接口 0/1：CDC-ECM（无 MS 描述符） | `uncm0` |
+
+所有模式统一使用 `uncm0` 作为网络设备名，切换模式不会改变 `br-usb` 的成员，因此 DHCP、防火墙与路由配置无需随之调整。
+
+### 模式选择建议
+
+| 主机 | 推荐模式 | 说明 |
+|---|---|---|
+| Android 8+ 手机 / 车机 | `rndis` | Android 的 USB 共享网络本身基于 RNDIS，`rndis_host` 属标配驱动，插上即用 |
+| Windows 10/11 | `ncm` | 原生 `UsbNcm.sys`，并支持 PAM U3 硬件卸载 |
+| Windows 7/8 | `rndis` | 系统自带 `usb8023`/`rndismpx` |
+| Linux / macOS | `ncm` 或 `ecm` | 均为内核原生类驱动，无需安装 |
+| 需要旁路调试通道 | 任意模式 + `acm` | 额外暴露 `/dev/ttyGS0` ↔ 主机 `/dev/ttyACM0` |
+
+若配置的模式在启动时无法实例化（内核缺对应 gadget 功能或描述符写入失败），`udx-usb-gadget start` 会自动回退到 `ncm` 并把该回退写回 UCI，保证设备不会因为一个不可用的模式而失去管理链路。
 
 启用 ACM 时，接口 2/3 追加 CDC-ACM 串口（`/dev/ttyGS0`）。设备描述符使用复合设备 IAD 类型 `ef/02/01`，并在 NCM 接口 0 上提供 `MSFT100`（Vendor Request `0xcd`、`WINNCM`）描述符。
 

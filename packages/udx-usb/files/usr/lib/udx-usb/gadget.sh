@@ -173,7 +173,14 @@ g_boot_mark() {
 }
 
 g_load_config() {
-	PROFILE=$(uci -q get udx-usb.main.profile) || return 1
+	PROFILE=$(uci -q get udx-usb.main.profile) || PROFILE=ncm
+	# A hand-edited or downgraded config must not leave the unit without a
+	# management link: unknown values start in the proven default instead.
+	case "$PROFILE" in
+		ncm|ncm-software|rndis|ecm) ;;
+		*) g_error "unknown profile '$PROFILE'; starting in ncm instead"
+		   PROFILE=ncm ;;
+	esac
 	ACM=$(uci -q get udx-usb.main.acm) || ACM=0
 	SERIAL=$(uci -q get udx-usb.main.serial) || SERIAL=auto
 	VID=$(uci -q get udx-usb.main.vid) || return 1
@@ -189,10 +196,18 @@ g_load_config() {
 }
 
 g_profile() {
+	OS_DESC=1 COMPAT_ID= COMPAT_SUB=
 	case "$PROFILE" in
-		ncm) FUNCTIONS=ncm; PID=0x0105; PAMU3=1 ;;
-		ncm-software) FUNCTIONS=ncm; PID=0x0105; PAMU3=0 ;;
-		*) g_error 'profile must be ncm or ncm-software'; return 64 ;;
+		ncm) FUNCTIONS=ncm; PID=0x0105; PAMU3=1; COMPAT_ID=WINNCM ;;
+		ncm-software) FUNCTIONS=ncm; PID=0x0105; PAMU3=0; COMPAT_ID=WINNCM ;;
+		# RNDIS: the only ethernet-over-USB class that Android host stacks and
+		# Windows both drive without an extra package. Android tethering itself
+		# ships rndis_host, so car head units recognise this without drivers.
+		rndis) FUNCTIONS=rndis; PID=0x0106; PAMU3=0; COMPAT_ID=RNDIS; COMPAT_SUB=5162001 ;;
+		# ECM: native in Linux, Android and macOS; no Windows driver exists and
+		# the function has no os_desc, so MS descriptors stay disabled.
+		ecm) FUNCTIONS=ecm; PID=0x0107; PAMU3=0; OS_DESC=0 ;;
+		*) g_error 'profile must be ncm, ncm-software, rndis or ecm'; return 64 ;;
 	esac
 	case "$ACM" in
 		0) ;;
@@ -264,18 +279,34 @@ g_lock() {
 }
 
 g_net_function() {
-	local dir=$UDX_G/functions/ncm.usb0
+	local kind=$1 dir iface
+	case "$kind" in
+		ncm) dir=$UDX_G/functions/ncm.usb0 ;;
+		rndis) dir=$UDX_G/functions/rndis.usb0 ;;
+		ecm) dir=$UDX_G/functions/ecm.usb0 ;;
+		*) g_error "unsupported ethernet function $kind"; return 64 ;;
+	esac
 	g_mkdir "$dir" || return 1
+	# Every profile uses the same port name so br-usb membership, DHCP and the
+	# firewall zone survive a mode change untouched.
 	g_write "$dir/ifname" 'uncm%d' || return 1
 	g_write "$dir/dev_addr" "$DEV_MAC" || return 1
 	g_write "$dir/host_addr" "$HOST_MAC" || return 1
-	g_write "$dir/max_segment_size" 1514 || return 1
-	g_write "$dir/pamu3" "$PAMU3" || return 1
-	# Windows UsbNcm.sys matches MS_COMP_WINNCM. WINUSB would select
-	# Winusb.sys and would not expose this function as a network adapter.
-	g_write "$dir/os_desc/interface.ncm/compatible_id" WINNCM || return 1
-	g_write "$dir/os_desc/interface.ncm/sub_compatible_id" '' || return 1
-	g_link "$dir" "$UDX_G/configs/c.1/ncm.usb0"
+	[ ! -e "$dir/max_segment_size" ] || g_write "$dir/max_segment_size" 1514 || return 1
+	# PAM U3 offload is only present on the NCM and RNDIS functions.
+	[ ! -e "$dir/pamu3" ] || g_write "$dir/pamu3" "$PAMU3" || return 1
+	if [ "$OS_DESC" = 1 ]; then
+		# Windows matches WINNCM to UsbNcm.sys and RNDIS to usb8023/rndismpx.
+		# WINUSB would select Winusb.sys and hide the network adapter.
+		for iface in "$dir"/os_desc/interface.*; do
+			[ -d "$iface" ] || continue
+			[ ! -e "$iface/compatible_id" ] ||
+				g_write "$iface/compatible_id" "$COMPAT_ID" || return 1
+			[ ! -e "$iface/sub_compatible_id" ] ||
+				g_write "$iface/sub_compatible_id" "$COMPAT_SUB" || return 1
+		done
+	fi
+	g_link "$dir" "$UDX_G/configs/c.1/${dir##*/}"
 }
 
 g_create() {
@@ -307,10 +338,12 @@ g_create() {
 	g_mkdir "$UDX_G/configs/c.1/strings/0x409" || return 1
 	g_write "$UDX_G/configs/c.1/strings/0x409/configuration" "$PROFILE management" || return 1
 	for kind in $FUNCTIONS; do g_net_function "$kind" || return 1; done
-	g_write "$UDX_G/os_desc/use" 1 || return 1
-	g_write "$UDX_G/os_desc/b_vendor_code" 0xcd || return 1
-	g_write "$UDX_G/os_desc/qw_sign" MSFT100 || return 1
-	g_link "$UDX_G/configs/c.1" "$UDX_G/os_desc/c.1" || return 1
+	if [ "$OS_DESC" = 1 ]; then
+		g_write "$UDX_G/os_desc/use" 1 || return 1
+		g_write "$UDX_G/os_desc/b_vendor_code" 0xcd || return 1
+		g_write "$UDX_G/os_desc/qw_sign" MSFT100 || return 1
+		g_link "$UDX_G/configs/c.1" "$UDX_G/os_desc/c.1" || return 1
+	fi
 	if [ "$ACM" = 1 ]; then
 		g_mkdir "$UDX_G/functions/acm.maint" || return 1
 		[ "$(g_read "$UDX_G/functions/acm.maint/port_num")" = 0 ] || { g_error 'ttyGS0 is already allocated'; return 1; }
@@ -342,12 +375,16 @@ g_destroy() {
 		"$UDX_UDC") g_write "$UDX_G/UDC" '' || return 1;;
 		*) g_error 'owned gadget is bound to an unexpected controller'; return 1;;
 	esac
-	for path in "$UDX_G/os_desc/c.1" "$UDX_G/configs/c.1/acm.maint" \
-		"$UDX_G/configs/c.1/ncm.usb0"; do
+	# Unlink every function of the active configuration before removing the
+	# function instances, whatever profile they belong to.
+	for path in "$UDX_G"/configs/c.1/*; do
 		[ ! -L "$path" ] || g_unlink "$path" || return 1
 	done
+	[ ! -L "$UDX_G/os_desc/c.1" ] || g_unlink "$UDX_G/os_desc/c.1" || return 1
+	for path in "$UDX_G"/functions/*; do
+		[ ! -d "$path" ] || g_rmdir "$path" || return 1
+	done
 	for path in "$UDX_G/configs/c.1/strings/0x409" "$UDX_G/configs/c.1" \
-		"$UDX_G/functions/acm.maint" "$UDX_G/functions/ncm.usb0" \
 		"$UDX_G/strings/0x409"; do
 		[ ! -d "$path" ] || g_rmdir "$path" || return 1
 	done

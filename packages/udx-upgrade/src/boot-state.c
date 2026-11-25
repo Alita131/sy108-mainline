@@ -367,10 +367,14 @@ static int boot_management_ready(void)
 {
 	char value[512];
 	/* Logical gadget readiness is independent of a connected host or SIM.
-	 * All run files are from this boot; require the live UDC binding too. */
+	 * All run files are from this boot; require the live UDC binding too.
+	 * Any supported ethernet profile satisfies readiness - the listener and
+	 * DHCP checks below still prove the management link actually works. */
 	if (text("/sys/kernel/config/usb_gadget/udx-usb/UDC", value, sizeof(value)) ||
 	    strcmp(value, "29100000.usb\n") || text("/run/udx-usb/applied", value, sizeof(value)) ||
-	    (strncmp(value, "profile=ncm\n", 12) && strncmp(value, "profile=ncm-software\n", 21)) ||
+	    (strncmp(value, "profile=ncm\n", 12) &&
+	     strncmp(value, "profile=ncm-software\n", 21) &&
+	     strncmp(value, "profile=rndis\n", 14) && strncmp(value, "profile=ecm\n", 12)) ||
 	    management_listener(22) || (management_listener(80) && management_listener(443)) ||
 	    management_network_ready())
 		return -1;

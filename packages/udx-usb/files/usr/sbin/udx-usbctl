@@ -32,7 +32,10 @@ case "${1:-status}" in
 		exit 0
 		;;
 	*)
-		echo 'usage: udx-usbctl status | start | switch {ncm|ncm-software} [acm|no-acm] | reset | stop | cancel-pending' >&2
+		echo 'usage: udx-usbctl status | start | switch {ncm|ncm-software|rndis|ecm} [acm|no-acm] | reset | stop | cancel-pending' >&2
+		echo '  ncm       Windows 11 / modern Linux, fastest (PAM U3 offload)' >&2
+		echo '  rndis     Android 8+ hosts and car head units, Windows 7+; plug and play' >&2
+		echo '  ecm       Linux / Android / macOS native, no Windows driver' >&2
 		exit 64;;
 esac
 if [ "$request" = reset ] && [ -f "$UDX_RUN/pending" ] && [ "$(g_read "$UDX_RUN/pending")" = reset ]; then
@@ -51,4 +54,4 @@ if ! ubus call service add "{\"name\":\"udx-usb-apply\",\"instances\":{\"apply\"
 	exit 1
 fi
 echo "queued=$request"
-[ "$request" = reset ] || echo 'Changing NCM processing mode restarts the device; other USB changes reconnect it. Check udx-usbctl status after reconnection.'
+[ "$request" = reset ] || echo 'Profile changes restart the device; ACM changes reconnect it. Check udx-usbctl status after reconnection.'
